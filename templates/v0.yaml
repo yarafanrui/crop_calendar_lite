@@ -1,0 +1,119 @@
+---
+openapi: 3.0.0
+info:
+  title: Crop Calendar APIs v0
+  description: version 0
+  version: 0.0.0-alpha
+servers:
+  - url: 'http://localhost:8084/apis'
+paths:
+  '/latlng2fourdates-2':
+    get:
+      summary: Input LatLng to get the 'four dates data' -- (sow, harvest)*(start, end)
+      description: Input LatLng to get the 'four dates data'
+      parameters:
+      - name: lat
+        in: query
+        schema:
+          type: string
+        required: true
+        description: Latitude
+      - name: lng
+        in: query
+        schema:
+          type: string
+        required: true
+        description: Longitude
+      tags:
+        - LatLng to Four Dates
+      responses:
+        '200':
+          description: Four Dates retrieved.
+          content:
+            application/json:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/'
+      security:
+        - api_key: []
+
+  '/test-2/':
+    get:
+      summary: General Channel to Create, Retrieve, Update and Delete
+      description: Retrive
+      parameters:
+      - name: app
+        in: query
+        schema:
+          type: string
+        required: true
+        description: app name
+      - name: class
+        in: query
+        schema:
+          type: string
+        required: true
+        description: class name
+      tags:
+        - General
+      responses:
+        '200':
+          description: Data retrieved.
+          content:
+            application/json:
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/'
+      security:
+        - api_key: []
+    post:
+      summary: General Channel to Create, Retrieve, Update and Delete
+      description: Create
+      tags:
+        - General
+      responses:
+        '201':
+          description: Object Created.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#'
+      security:
+        - api_key: []
+    put:
+      summary: General Channel to Create, Retrieve, Update and Delete
+      description: Update
+      tags:
+      - General
+      responses:
+        '20x':
+          description: Object Updated.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#'
+      security:
+      - api_key: []
+
+    delete:
+      summary: General Channel to Create, Retrieve, Update and Delete
+      description: Delete
+      tags:
+      - General
+      responses:
+        '20x':
+          description: Object deleted.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#'
+      security:
+      - api_key: []
+...

@@ -438,8 +438,18 @@ class LatLng2FourDates_2(APIView):
 
         return Response({})
 
-'''
-def add_new_four_dates():
-    print('this is a post request')
 
-'''
+def v0_doc(request):
+    import yaml, json
+
+    with open('templates/v0.yaml', 'r') as stream:
+        try:
+            yaml_string = json.dumps(yaml.load(stream))
+
+        except yaml.YAMLError as e:
+            print(e)
+            return HttpResponse("Error!")
+
+    return render(request, 'yaml-template.html', {'yaml_string': yaml_string})
+
+
