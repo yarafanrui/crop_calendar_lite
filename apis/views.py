@@ -4,15 +4,21 @@ from django.http import HttpResponse, JsonResponse
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.permissions import IsAuthenticated
 
 from four_dates.serializers import LocationSerializer, FourDatesSerializer
+from .serializers import TaskSerializer
+
 from django.db.models.fields.related import ForeignKey
 from django.db.models import CharField, DecimalField, IntegerField
 from django.apps import apps
 
-from background_task import background
+from background_task.models import Task
 
 from . import crud
+
+import json
 
 
 class TestView(APIView):
@@ -92,6 +98,8 @@ class TestView(APIView):
 
 
 class TestView_2(APIView):
+    authentication_classes = (SessionAuthentication, BasicAuthentication)
+    permission_classes = (IsAuthenticated,)
 
     def get(self, request, ):
 
@@ -103,11 +111,17 @@ class TestView_2(APIView):
 
         if obj_list.model.__name__ in ['Country']:
             ser = LocationSerializer(obj_list, many=True)
+
+        elif obj_list.model.__name__ in ['Task']:
+            ser = TaskSerializer(obj_list, many=True)
+
         else:
             ser = FourDatesSerializer(obj_list, many=True)
+
         return Response(ser.data)
 
     def post(self, request, ):
+
         import json
 
         info_received = json.loads(request.body)
@@ -365,6 +379,8 @@ class LatLng2FourDates_2(APIView):
             lat = float(request.GET.get('lat'))
             lng = float(request.GET.get('lng'))
 
+            print("lat: " + str(lat))
+            print("lng: " + str(lng))
         except:
             return HttpResponse("Invalid lat-lng!")
 
@@ -390,6 +406,8 @@ class LatLng2FourDates_2(APIView):
             country = general_query(**kw)
             print(country)
             country = country[0]
+
+            print("Country Found")
         except:
             try:
                 kw = {"app": "four_dates",
@@ -434,9 +452,105 @@ class LatLng2FourDates_2(APIView):
         return Response(ser.data)
 
     def post(self, request, ):
-        # add_new_four_dates()
+        import json
 
-        return Response({})
+        info_received = json.loads(request.body)
+
+        try:
+            lat = float(info_received['data']['lat'])
+            lng = float(info_received['data']['lng'])
+
+            crop_name = str(info_received['data']['crop_name'])
+
+            print("lat: " + str(lat))
+            print("lng: " + str(lng))
+        except:
+            return HttpResponse("Invalid lat-lng!")
+
+        data_fetched = latlng2name_basic(lat, lng)
+
+        try:
+            country_name = data_fetched["country_name"]
+            sub_region_name = data_fetched["sub_region_name"]
+            alpha_3_code = data_fetched["alpha_3_code"]
+        except:
+            return HttpResponse("Lat-Lng invalid.")
+
+        print("country_name: " + country_name)
+        print("alpha_3_code: " + alpha_3_code)
+
+        # Look Up for the Country
+        try:
+            kw = {"app": "four_dates",
+                  "class": "Country",
+                  "name": country_name}
+
+            country = general_query(**kw)
+            print(country)
+            country = country[0]
+
+            print("Country Found")
+        except:
+            try:
+                kw = {"app": "four_dates",
+                      "class": "Country",
+                      "alpha_3_code": alpha_3_code}
+                country = general_query(**kw)[0]
+
+            except:
+                return HttpResponse("Country Not Found")
+
+        # Look up for the sub-region
+        try:
+            kw = {"app": "four_dates", "class": "SubRegion", "name": sub_region_name}
+            sub_region = general_query(**kw)[0]
+        except:
+            kw = {"app": "four_dates", "class": "SubRegion", "country_id": country.id}
+            sub_region = general_query(**kw)[0]
+
+        print("sub_region.name: " + sub_region.name)
+
+        # Look up for the Crop
+        try:
+            kw = {"app": "four_dates", "class": "Crop", "name": crop_name}
+            crop = general_query(**kw)[0]
+        except:
+            return HttpResponse("Crop Not Found")
+
+        # Create new FourDate Record
+        kw = {"app": "four_dates", "class": "FourDates", "data": {}}
+        kw["data"]["plant_start"] = info_received["data"]["plant_start"]
+        kw["data"]["plant_end"] = info_received["data"]["plant_end"]
+        kw["data"]["harvest_start"] = info_received["data"]["harvest_start"]
+        kw["data"]["harvest_end"] = info_received["data"]["harvest_end"]
+        kw["data"]["sub_region_id"] = sub_region.id
+        kw["data"]["crop_id"] = crop.id
+
+        crud.create_one(**kw)
+        return JsonResponse({"info": "pending creating"})
+
+    def put(self, request, ):
+        import json
+
+        info_received = json.loads(request.body)
+
+        kw = info_received
+        kw["app"] = "four_dates"
+        kw["class"] = "FourDates"
+
+        crud.update_one(**kw)
+        return JsonResponse({"info": "pending updating"})
+
+    def delete(self, request, ):
+        import json
+
+        info_received = json.loads(request.body)
+        kw = info_received
+        kw["app"] = "four_dates"
+        kw["class"] = "FourDates"
+
+        crud.delete_one(**info_received)
+        return JsonResponse({"info": "pending deleting"})
 
 
 def v0_doc(request):
@@ -452,4 +566,168 @@ def v0_doc(request):
 
     return render(request, 'yaml-template.html', {'yaml_string': yaml_string})
 
+
+def task_list(request):
+    task_list = Task.objects.all()
+    tasks_to_return = []
+    for task in task_list:
+        single_task = dict()
+
+        single_task['action'] = task.task_name
+        task_data = json.loads(task.task_params)[1]
+
+        if task.task_name == "apis.crud.create_one":
+            print("create_one")
+            new_item = task_data
+
+            single_task['app'] = new_item['app']
+            single_task['class'] = new_item['class']
+
+            try:
+                app_name = single_task['app']
+                class_name = single_task['class']
+            except:
+                return []
+
+            data_models = apps.get_app_config(app_name).get_models()
+
+            for data_model in data_models:
+                if data_model.__name__ == class_name:
+                    data_model_to_return = data_model
+                    break
+            try:
+                data_model_to_return
+            except NameError:
+                return []
+
+            obj = data_model_to_return(**new_item['data'])
+
+            single_task['old'] = {}
+            single_task['new'] = dict()
+
+            for item in new_item['data']:
+
+                if item == 'crop_id':
+                    print(item[:item.index('_id')])
+                    single_task['new']['crop'] = obj.crop.name
+                elif item == 'sub_region_id':
+                    single_task['new']['sub_region'] = obj.sub_region.name
+                
+                '''
+
+                if '_id' in item:
+                    print(item[:item.index('_id')])
+                    field_object = data_model_to_return._meta.get_field(item[:item.index('_id')])
+                    field_value = field_object.value_from_object(obj)
+                    single_task['new'][item[:item.index('_id')]] = field_value.name
+                '''
+                single_task['new'][item] = new_item['data'][item]
+
+            tasks_to_return = tasks_to_return + [single_task]
+
+        elif task.task_name == "apis.crud.delete_one":
+            print("delete_one")
+            old_item = task_data
+
+            single_task['app'] = old_item['app']
+            single_task['class'] = old_item['class']
+
+            try:
+                app_name = single_task['app']
+                class_name = single_task['class']
+            except:
+                return []
+
+            data_models = apps.get_app_config(app_name).get_models()
+
+            for data_model in data_models:
+                if data_model.__name__ == class_name:
+                    data_model_to_return = data_model
+                    break
+            try:
+                data_model_to_return
+            except NameError:
+                return []
+
+            old_id = old_item['id']
+            single_task['old'] = dict()
+            old_item = crud.retrieve_list(**{'app': app_name, 'class': class_name, 'id': old_id})[0]
+
+            # crud.retrieve_list(**{'app': app_name, 'class': class_name, 'id': old_id})  # TODO
+            single_task['new'] = dict()
+
+            single_task['old']['harvest_end'] = old_item.harvest_end
+            single_task['old']['harvest_start'] = old_item.harvest_start
+            single_task['old']['plant_end'] = old_item.plant_end
+            single_task['old']['plant_start'] = old_item.plant_start
+            single_task['old']['crop_id'] = old_item.crop_id
+            single_task['old']['sub_region_id'] = old_item.sub_region_id
+            single_task['old']['crop'] = old_item.crop.name
+            single_task['old']['sub_region'] = old_item.sub_region.name
+
+            # TODO
+            # Hard Coded First
+
+            tasks_to_return = tasks_to_return + [single_task]
+
+
+        elif task.task_name == "apis.crud.update_one":
+            print("update_one")
+            new_item = task_data
+
+            single_task['app'] = new_item['app']
+            single_task['class'] = new_item['class']
+
+            try:
+                app_name = single_task['app']
+                class_name = single_task['class']
+            except:
+                return []
+
+            data_models = apps.get_app_config(app_name).get_models()
+
+            for data_model in data_models:
+                if data_model.__name__ == class_name:
+                    data_model_to_return = data_model
+                    break
+            try:
+                data_model_to_return
+            except NameError:
+                return []
+
+            obj = data_model_to_return(**new_item['data'])
+
+            old_id = new_item['id']
+            single_task['old'] = dict()
+            old_item = crud.retrieve_list(**{'app': app_name, 'class': class_name, 'id': old_id})[0]
+
+            # crud.retrieve_list(**{'app': app_name, 'class': class_name, 'id': old_id})  # TODO
+            single_task['new'] = dict()
+
+            for item in new_item['data']:
+                if item == 'crop_id':
+                    print(item[:item.index('_id')])
+                    single_task['new']['crop'] = obj.crop.name
+                elif item == 'sub_region_id':
+                    single_task['new']['sub_region'] = obj.sub_region.name
+                single_task['new'][item] = new_item['data'][item]
+
+            single_task['old']['harvest_end'] = old_item.harvest_end
+            single_task['old']['harvest_start'] = old_item.harvest_start
+            single_task['old']['plant_end'] = old_item.plant_end
+            single_task['old']['plant_start'] = old_item.plant_start
+            single_task['old']['crop_id'] = old_item.crop_id
+            single_task['old']['sub_region_id'] = old_item.sub_region_id
+            single_task['old']['crop'] = old_item.crop.name
+            single_task['old']['sub_region'] = old_item.sub_region.name
+
+            # TODO
+            # Hard Coded First
+
+            tasks_to_return = tasks_to_return + [single_task]
+
+
+    print(len(tasks_to_return))
+    #return HttpResponse("<h1> Task List. </h1>")
+    return JsonResponse({"tasks": tasks_to_return})
 

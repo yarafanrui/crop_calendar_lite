@@ -5,9 +5,11 @@ info:
   description: version 0
   version: 0.0.0-alpha
 servers:
-  - url: 'http://localhost:8084/apis'
+  - url: 'http://localhost:8090/apis'
+  - url: 'http://localhost:8080/apis'
+  - url: 'http://54.169.154.198/api'
 paths:
-  '/latlng2fourdates-2':
+  '/latlng2fourdates-2/':
     get:
       summary: Input LatLng to get the 'four dates data' -- (sow, harvest)*(start, end)
       description: Input LatLng to get the 'four dates data'
@@ -38,6 +40,52 @@ paths:
               $ref: '#/'
       security:
         - api_key: []
+    post:
+      summary: Input LatLng, Crop Name and 'Four Dates' to add a record.
+      description: Create
+      tags:
+        - LatLng to Four Dates
+      responses:
+        '201':
+          description: Object Created.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#'
+      security:
+        - api_key: []
+    put:
+      summary: Id and 'Four Dates' to update a record.
+      description: Update
+      tags:
+        - LatLng to Four Dates
+      responses:
+        '20x':
+          description: Object Updated.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#'
+      security:
+      - api_key: []
+
+    delete:
+      summary: The id of record to delete a record.
+      description: Delete
+      tags:
+        - LatLng to Four Dates
+      responses:
+        '20x':
+          description: Object deleted.
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#'
+      security:
+      - api_key: []
 
   '/test-2/':
     get:
@@ -116,4 +164,5 @@ paths:
               $ref: '#'
       security:
       - api_key: []
+
 ...

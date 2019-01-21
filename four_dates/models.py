@@ -17,7 +17,7 @@ class SubRegion(models.Model):
 
     country = models.ForeignKey('Country', null=True, on_delete=models.CASCADE)
 
-    agro_eco_zone = models.CharField(max_length=200)
+    agro_eco_zone = models.CharField(max_length=200, null=True)
     sub_region_unit = models.ForeignKey('SubRegionUnit', null=True, on_delete=models.CASCADE)
     lat = models.FloatField(null=True)
     lng = models.FloatField(null=True)
@@ -28,15 +28,16 @@ class Crop(models.Model):
 
 
 class FourDates(models.Model):
+    name = models.CharField(max_length=100, null=True)
     sub_region = models.ForeignKey('SubRegion', on_delete=models.CASCADE)
     crop = models.ForeignKey('Crop', on_delete=models.CASCADE)
 
-    source_file = models.CharField(max_length=20)
+    source_file = models.CharField(max_length=20, null=True)
 
     plant_start = models.IntegerField(null=True)
     plant_end = models.IntegerField(null=True)
     harvest_start = models.IntegerField(null=True)
     harvest_end = models.IntegerField(null=True)
 
-    flag = models.BooleanField()
+    flag = models.BooleanField(default=False)
 
